@@ -87,12 +87,11 @@ issues sharing ths root cause.
 This is the fix I implemented when debugging this issue. It does work and requires
 only minimal modifications.
 
-## Modify `AwsLambdaInstrumentor().instrument()`
-The `AwsLambdaInstrumentor().instrument()` method could be modified to compute
-the path to the `ORIG_HANDLER` it loads by replacing the slashes with dots as
-the `otel_wrapper.py` script does. This would ensure that the path is valid for
-import, preventing the error.
+## Modify `AwsLambdaInstrumentor.instrument`
+The `AwsLambdaInstrumentor.instrument` method could be modified to locally
+compute the path to the `ORIG_HANDLER` as `otel_wrapper.py` does (i.e., by
+replacing `/` with `.`). This would ensure that the path is valid for import,
+preventing the error.
 
 This fix duplicates the path modification logic, but it reduces the potential
 of unexpected side effects by keeping the scope small and targeted.
-
