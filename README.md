@@ -11,13 +11,13 @@ for Python-based Lambda functions.  Specifically, this issue exists in version
 Lambda function handlers can be specified in at least the two following ways for
 Python functions:
 
- - package1.package2.module.handler
- - package1/package2/module.handler
+ - `package1.package2.module.handler`
+ - `package1/package2/module.handler`
 
-Either of these forms is valid and executes module.handler_func as expected when
+Either of these forms is valid and executes `module.handler` as expected when
 the function is invoked. However, the OpenTelemetry Lambda layer does not
 properly handle the second form. If it is enabled, invocation results in the
-following error response:
+following error response when slash-based paths are used:
 
 ```json
 {
@@ -48,7 +48,7 @@ stack and invoke the functions it creates.
 
 There are four functions which will be created:
 
- - SlashPathWithLayerBroken
+ - SlashPathWithLayerBroken <-- **BROKEN**
  - SlashPathNoLayerWorks
  - DotPathNoLayerWorks
  - DotPathWithLayerWorks
