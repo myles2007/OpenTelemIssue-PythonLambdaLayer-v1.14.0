@@ -1,0 +1,99 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Example of path handling differences when using OpenTelemetry layer."
+Parameters:
+  OpenTelemetryLayer:
+    Default: arn:aws:lambda:us-east-1:901920570463:layer:aws-otel-python-amd64-ver-1-14-0:1
+    Type: String
+
+Resources:
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess
+
+  ##########################################################################
+  # Using a slash-based path (except for the actual handler function module)
+  # works fine in AWS Lambda without the OpenTelemetry layer.
+  ##########################################################################
+  SlashPathNoLayerWorks:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code: "./src"
+      FunctionName: "SlashPathNoLayerWorks"
+      Handler: "package1/package2/module.handler"
+      Runtime: python3.9
+      Role: !GetAtt ExecutionRole.Arn
+      TracingConfig:
+        Mode: Active
+
+  ##########################################################################
+  # Using a slash-based path (except for the actual handler function module)
+  # breaks when the OpenTelemetry layer is included. The error is:
+  #
+  #  -> [ERROR] Runtime.ImportModuleError: Unable to import module 'otel_wrapper':
+  #             No module named package1/package2/module
+  #
+  #     (split across lines for readability)
+  #
+  # The issue exists in the auto instrumentation applied in otel_wrapper.py.
+  # The wrapper itself does have special handling for this path style, but
+  # the auto instrumentation does not. I believe it fails within `wrapt`
+  # during the patching process, but have not completely traced it.
+  ##########################################################################
+  SlashPathWithLayerBroken:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code: "./src"
+      Handler: "package1/package2/module.handler"
+      FunctionName: "SlashPathWithLayerBroken"
+      Runtime: python3.9
+      Environment:
+        Variables:
+          AWS_LAMBDA_EXEC_WRAPPER: "/opt/otel-instrument"
+      Role: !GetAtt ExecutionRole.Arn
+      Layers:
+        - !Ref OpenTelemetryLayer
+      TracingConfig:
+        Mode: Active
+
+  ##########################################################################
+  # Using a dot-based path works fine in AWS Lambda both with and without
+  # the OpenTelemetry layer in place.
+  ##########################################################################
+  DotPathNoLayerWorks:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code: "./src"
+      Handler: "package1.package2.module.handler"
+      FunctionName: "DotPathNoLayerWorks"
+      Runtime: python3.9
+      Role: !GetAtt ExecutionRole.Arn
+      TracingConfig:
+        Mode: Active
+
+  DotPathWithLayerWorks:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code: "./src"
+      Handler: "package1.package2.module.handler"
+      FunctionName: "DotPathWithLayerWorks"
+      Runtime: python3.9
+      Environment:
+        Variables:
+          AWS_LAMBDA_EXEC_WRAPPER: "/opt/otel-instrument"
+      Role: !GetAtt ExecutionRole.Arn
+      Layers:
+        - !Ref OpenTelemetryLayer
+      TracingConfig:
+        Mode: Active
